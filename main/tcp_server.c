@@ -4700,7 +4700,7 @@ void app_main()
 	vTaskDelay(10000 / portTICK_RATE_MS);
 
 	/* Start SNMP Agent */
-	snmp_agent_init();
+	snmp_app_init();
 }
 
 // for bacnet lib
