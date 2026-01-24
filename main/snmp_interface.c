@@ -4,13 +4,14 @@
 //===============================================================================
 
 //=================================== Includes ==================================
-#include "snmp_interface.h"
+#include <stdio.h>
 #include <string.h>
+#include "snmp_interface.h"
 #include "esp_log.h"
 #include "SnmpAgent.h"
+#include "t3_snmp_bacnet_mapping.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "t3_snmp_bacnet_mapping.h"
 
 //=================================== Defines ===================================
 // SNMP agent configuration.
@@ -31,40 +32,41 @@ char sysName[]     = "Temco Controller";
 char sysLocation[] = "placeName";
 char sysIpAddress[] = "192.168.1.17";
 
+char description[21] = "";
+
+// SNMP MIB entries
 unsigned char entOIDBer[MIB_DATA_SIZE];
 
-char dInIndex[] = "P.38644.30.1.1.2.10";
-unsigned char c, lastDIN;
-
-static uint32_t data[32] = {0};
+// SNMP trap destination
 char trapDstAddr[] = TRAP_DST_ADDR;
+char dInIndex[] = "P.38644.30.1.1.2.10";
 
+// MIB tree
 MIB *thismib = NULL;
+
+// Temporary variables
 uint32_t u32;
 
-//=================================== Functions ================================
+//================================= Functions ================================
 void initMibTree();
 static void init_standard_mibs(void);
 static void init_private_mibs(void);
 
 int get_uptime(MIB *thismib);
 int get_ipaddress(MIB *thismib);
-int get_ain(MIB *thismib);
-int set_dio(MIB *thismib, void *ptr, int len);
-int get_dio(MIB *thismib);
 
 // T3 SNMP MIB Read Callbacks
 int t3_read_output(MIB *thismib);
 int t3_read_input(MIB *thismib);
 int t3_read_variable(MIB *thismib);
-int t3_read_description(MIB *thismib);
 
 // T3 SNMP MIB Write Callbacks
 int t3_write_output(MIB *thismib, void *ptr, int len);
 int t3_write_variable(MIB *thismib, void *ptr, int len);
-int t3_write_description(MIB *thismib, void *ptr, int len);
 
 void snmp_agent_init(void);
+
+//============================= Function Definitions ===========================
 
 //---------------------------------------------------
 // SNMP Agent Initialization
@@ -100,7 +102,7 @@ static void snmp_agent_task(void *pvParameters)
 //---------------------------------------------------
 void snmp_agent_init(void)
 {
-    ESP_LOGI(TAG, "T3 SNMP agent initialized");
+	ESP_LOGI(TAG, "T3 SNMP agent initialized");
 	xTaskCreate(snmp_agent_task, "snmp_agent_task", 4096, NULL, 5, NULL);
 }
 
@@ -208,7 +210,7 @@ static void init_private_mibs(void)
 
         /* desc (OCTET_STRING, RD_ONLY) */
         snprintf(oid_buffer, sizeof(oid_buffer), "%s%s.%u", T3_INPUTS_OID_BASE, T3_INPUT_DESC_OID, idx);
-        thismib = miblistadd(mibTree, oid_buffer, OCTET_STRING, RD_ONLY, NULL, 0);
+        thismib = miblistadd(mibTree, oid_buffer, OCTET_STRING, RD_ONLY, description, strlen(description));
         if (thismib) {
             mibsetvalue(thismib, "", 0);
             mibsetcallback(thismib, t3_read_input, NULL);
@@ -264,7 +266,7 @@ static void init_private_mibs(void)
 
         /* desc (OCTET_STRING, RD_WR) */
         snprintf(oid_buffer, sizeof(oid_buffer), "%s%s.%u", T3_OUTPUTS_OID_BASE, T3_OUTPUT_DESC_OID, idx);
-        thismib = miblistadd(mibTree, oid_buffer, OCTET_STRING, RD_WR, NULL, 0);
+        thismib = miblistadd(mibTree, oid_buffer, OCTET_STRING, RD_WR, description, strlen(description));
         if (thismib) {
             mibsetvalue(thismib, "", 0);
             mibsetcallback(thismib, t3_read_output, t3_write_output);
@@ -318,7 +320,7 @@ static void init_private_mibs(void)
 
         /* desc (OCTET_STRING, RD_WR) */
         snprintf(oid_buffer, sizeof(oid_buffer), "%s%s.%u", T3_VARIABLES_OID_BASE, T3_VARIABLE_DESC_OID, idx);
-        thismib = miblistadd(mibTree, oid_buffer, OCTET_STRING, RD_WR, NULL, 0);
+        thismib = miblistadd(mibTree, oid_buffer, OCTET_STRING, RD_WR, description, strlen(description));
         if (thismib) {
             mibsetvalue(thismib, "", 0);
             mibsetcallback(thismib, t3_read_variable, t3_write_variable);
@@ -379,22 +381,21 @@ int t3_read_input(MIB *thismib)
 	char oid_buffer[128] = {0};
 	t3_snmp_bacnet_mapping_t mapping;
     char* snmp_oid = miboid_to_string(&thismib->oid, oid_buffer, sizeof(oid_buffer));
-	ESP_LOGI(TAG, "t3_read_input called for OID: %s", snmp_oid);
+	ESP_LOGI(TAG, "Read input for OID: %s", snmp_oid);
 
     // Get mapping
     if (!t3_map_snmp_oid_to_bacnet(snmp_oid, &mapping)) {
 		ESP_LOGE(TAG, "No mapping for OID: %s", snmp_oid);
         return NO_SUCH_NAME;
     }
-    ESP_LOGI(TAG, "Read Input : instance [%d], field [%d], object_type [%d], bacnet_type [%d]",
-        mapping.instance, mapping.field, mapping.object_type, mapping.bacnet_type);
+    //ESP_LOGI(TAG, "Read Input : instance [%d], field [%d], object_type [%d], bacnet_type [%d]",
+    //    mapping.instance, mapping.field, mapping.object_type, mapping.bacnet_type);
 
     // Read value
     t3_data_value_t value;
     uint32_t instance = mapping.instance;
-    uint32_t field = mapping.object_type;
+    uint32_t field = mapping.field;
     int result = t3_read_input_value(instance, field, &value);
-    
     if (result == T3_SUCCESS)
     {
         if (field == T3_FIELD_ANALOG && value.is_analog) {
@@ -425,6 +426,7 @@ int t3_read_output(MIB *thismib)
 {
     char oid_buffer[128] = {0};
     char* snmp_oid = miboid_to_string(&thismib->oid, oid_buffer, sizeof(oid_buffer));
+    ESP_LOGI(TAG, "Read output for OID: %s", snmp_oid);
     
     // Get mapping
     t3_snmp_bacnet_mapping_t mapping;
@@ -435,7 +437,7 @@ int t3_read_output(MIB *thismib)
     // Read value
     t3_data_value_t value;
     uint32_t instance = mapping.instance;
-    uint32_t field = mapping.object_type;
+    uint32_t field = mapping.field;
     int result = t3_read_output_value(instance, field, &value);
 
     if (result == T3_SUCCESS)
@@ -468,6 +470,7 @@ int t3_read_variable(MIB *thismib)
 {
     char oid_buffer[128] = {0};
     char* snmp_oid = miboid_to_string(&thismib->oid, oid_buffer, sizeof(oid_buffer));
+    ESP_LOGI(TAG, "Read variable for OID: %s", snmp_oid);
     
     // Get mapping
     t3_snmp_bacnet_mapping_t mapping;
@@ -478,7 +481,7 @@ int t3_read_variable(MIB *thismib)
     // Read value
     t3_data_value_t value;
     uint32_t instance = mapping.instance;
-    uint32_t field = mapping.object_type;
+    uint32_t field = mapping.field;
     int result = t3_read_variable_value(instance, field, &value);
     
     if (result == T3_SUCCESS) {
@@ -505,6 +508,7 @@ int t3_write_output(MIB *thismib, void *ptr, int len)
 {
     char oid_buffer[128] = {0};
     char* snmp_oid = miboid_to_string(&thismib->oid, oid_buffer, sizeof(oid_buffer));
+    ESP_LOGI(TAG, "Write output for OID: %s", snmp_oid);
     
     // Get mapping
     t3_snmp_bacnet_mapping_t mapping;
@@ -515,9 +519,9 @@ int t3_write_output(MIB *thismib, void *ptr, int len)
     // Write value
     t3_data_value_t value;
     uint32_t instance = mapping.instance;
-    uint32_t field = mapping.object_type;
+    uint32_t field = mapping.field;
     memset(&value, 0, sizeof(t3_data_value_t));
-    
+    ESP_LOGI(TAG, "Write Output : instance [%d], field [%d]", instance, field);
     // Prepare value based on data type
     if (field == T3_FIELD_ANALOG) { // analogVal
         value.analog_value = thismib->u.intval;
@@ -543,6 +547,7 @@ int t3_write_variable(MIB *thismib, void *ptr, int len)
 {
     char oid_buffer[128] = {0};
     char* snmp_oid = miboid_to_string(&thismib->oid, oid_buffer, sizeof(oid_buffer));
+    ESP_LOGI(TAG, "Write variable for OID: %s", snmp_oid);
     
     t3_snmp_bacnet_mapping_t mapping;
     if (!t3_map_snmp_oid_to_bacnet(snmp_oid, &mapping)) {
@@ -551,7 +556,7 @@ int t3_write_variable(MIB *thismib, void *ptr, int len)
     
     t3_data_value_t value;
     uint32_t instance = mapping.instance;
-    uint32_t field = mapping.object_type;
+    uint32_t field = mapping.field;
     memset(&value, 0, sizeof(t3_data_value_t));
     
     // Prepare value based on data type
@@ -573,20 +578,6 @@ int t3_write_variable(MIB *thismib, void *ptr, int len)
 }
 
 /* Description read callback */
-int t3_read_description(MIB *thismib)
-{
-    // For now, return empty description
-    mibsetvalue(thismib, "", 0);
-    return SUCCESS;
-}
-
-/* Description write callback */
-int t3_write_description(MIB *thismib, void *ptr, int len)
-{
-    // For now, just accept the write but don't store
-    return SUCCESS;
-}
-
 int get_uptime(MIB *thismib)
 {
 	thismib->u.intval = sysUpTime();
@@ -597,34 +588,5 @@ int get_ipaddress(MIB *thismib)
 {
 	thismib->u.octetstring = (unsigned char *)sysIpAddress;
 	thismib->dataLen = strlen(sysIpAddress);
-	return SUCCESS;
-}
-
-int get_dio(MIB *thismib)
-{
-	int j=0;
-	c = thismib->oid.array[thismib->oid.len-1];
-	j = (uint32_t) data[c];
-	thismib->u.intval = j;
-	return SUCCESS;
-}
-
-int set_dio(MIB *thismib, void *ptr, int len)
-{
-	int j=0;
-	c = thismib->oid.array[thismib->oid.len-1];
-	j = *(uint32_t *)ptr;
-	// if ( j!=0 && j!=1 )
-	// 	return ILLEGAL_DATA;
-	// else
-	data[c] = j;
-	thismib->u.intval = j;
-	return SUCCESS;
-}
-
-int get_ain(MIB *thismib)
-{
-	c = thismib->oid.array[thismib->oid.len-1];
-	thismib->u.intval = data[c];
 	return SUCCESS;
 }

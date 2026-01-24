@@ -68,7 +68,7 @@
 
 //#include "types.h"
 
-#include "snmp_interface.h"
+//#include "snmp_interface.h"
 
 #define PORT CONFIG_EXAMPLE_PORT
 
@@ -4591,7 +4591,7 @@ void app_main()
 #if 1
     sprintf(debug_array,"app %u, mini_type %u, count_reboot = %u",SOFTREV,Modbus.mini_type,count_reboot);
     uart_write_bytes(UART_NUM_0, (const char *)debug_array, strlen(debug_array));
-    //Modbus.mini_type = MINI_TSTAT10;
+    Modbus.mini_type = MINI_TSTAT10;
 #endif
 
     if(Modbus.mini_type == MINI_TSTAT10)
@@ -4599,10 +4599,10 @@ void app_main()
 		LCD_IO_Init();
 		Display_DeviceName();
 	}
-	esp_netif_init();
-  if (Modbus.mini_type != MINI_BIG_ARM)
+	//esp_netif_init();
+    if (Modbus.mini_type != MINI_BIG_ARM)
     	uart_init(2);
-   //flag_ethernet_initial = ethernet_init();
+    flag_ethernet_initial = ethernet_init();
 
     xTaskCreate(wifi_task, "wifi_task", 4096, NULL, 5, &main_task_handle[1]);
 
@@ -4694,13 +4694,13 @@ void app_main()
 #endif
 
 
-//	xTaskCreate(smtp_client_task, "smtp_client_task", 2048, NULL, 5, NULL);
+    //xTaskCreate(smtp_client_task, "smtp_client_task", 2048, NULL, 5, NULL);
 
 	// Add some delay to allow other tasks to initialize.
 	vTaskDelay(10000 / portTICK_RATE_MS);
 
 	/* Start SNMP Agent */
-	snmp_app_init();
+	//snmp_app_init();
 }
 
 // for bacnet lib

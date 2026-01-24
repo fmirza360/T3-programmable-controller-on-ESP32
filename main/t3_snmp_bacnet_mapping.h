@@ -32,26 +32,26 @@ extern "C" {
 #define T3_VARIABLES_OID_BASE        "P.2026.1.3"
 
 /* Field OID Patterns per specification */
-#define T3_INPUT_INDEX_OID           ".1"
-#define T3_INPUT_CFGTYPE_OID         ".2"
-#define T3_INPUT_ANALOG_OID          ".3"
-#define T3_INPUT_BINARY_OID          ".4"
-#define T3_INPUT_DESC_OID            ".5"
-#define T3_INPUT_UNITS_OID           ".6"
+#define T3_INPUT_INDEX_OID           ".0"
+#define T3_INPUT_CFGTYPE_OID         ".1"
+#define T3_INPUT_ANALOG_OID          ".2"
+#define T3_INPUT_BINARY_OID          ".3"
+#define T3_INPUT_DESC_OID            ".4"
+#define T3_INPUT_UNITS_OID           ".5"
 
-#define T3_OUTPUT_INDEX_OID          ".1"
-#define T3_OUTPUT_CFGTYPE_OID        ".2"
-#define T3_OUTPUT_ANALOG_OID         ".3"
-#define T3_OUTPUT_BINARY_OID         ".4"
-#define T3_OUTPUT_DESC_OID           ".5"
-#define T3_OUTPUT_UNITS_OID          ".6"
+#define T3_OUTPUT_INDEX_OID          ".0"
+#define T3_OUTPUT_CFGTYPE_OID        ".1"
+#define T3_OUTPUT_ANALOG_OID         ".2"
+#define T3_OUTPUT_BINARY_OID         ".3"
+#define T3_OUTPUT_DESC_OID           ".4"
+#define T3_OUTPUT_UNITS_OID          ".5"
 
-#define T3_VARIABLE_INDEX_OID        ".1"
-#define T3_VARIABLE_CFGTYPE_OID      ".2"
-#define T3_VARIABLE_INT_OID          ".3"
-#define T3_VARIABLE_FLOAT_OID        ".4"
-#define T3_VARIABLE_DESC_OID         ".5"
-#define T3_VARIABLE_UNITS_OID        ".6"
+#define T3_VARIABLE_INDEX_OID        ".0"
+#define T3_VARIABLE_CFGTYPE_OID      ".1"
+#define T3_VARIABLE_INT_OID          ".2"
+#define T3_VARIABLE_FLOAT_OID        ".3"
+#define T3_VARIABLE_DESC_OID         ".4"
+#define T3_VARIABLE_UNITS_OID        ".5"
 
 typedef enum {
     T3_FIELD_INDEX       = 0,
@@ -128,7 +128,7 @@ typedef struct {
     uint32_t object_type;        // T3_OBJECT_INPUT/OUTPUT/VARIABLE
     uint32_t instance;          // 0-63
     uint32_t cfg_type;          // T3_CFGTYPE_*
-    uint32_t field;             // 1-6
+    uint32_t field;             // 0-5
     t3_bacnet_object_t bacnet_type;
     bool is_valid;
 } t3_snmp_bacnet_mapping_t;
@@ -139,7 +139,7 @@ typedef struct {
     int32_t binary_value;
     int32_t int_value;
     float float_value;
-    char string_value[65];
+    char string_value[21];
     bool is_analog;
     bool is_binary;
     bool is_integer;

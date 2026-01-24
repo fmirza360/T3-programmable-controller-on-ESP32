@@ -8,25 +8,11 @@
 #include <stdlib.h>
 
 #include "t3_snmp_bacnet_mapping.h"
-#include "snmp_interface.h"
 #include "esp_log.h"
 #include "bacnet.h"
 #include "user_data.h"
 #include "bacenum.h"
 #include "proprietary.h"
-
-// #include "ai.h"
-// #include "bi.h"
-
-// #include "ao.h"
-// #include "bo.h"
-
-// #include "av.h"
-// #include "bv.h"
-
-//#include "ud_str.h"
-
-extern Str_points_ptr put_io_buf(Point_type_equate type, uint8 point);
 
 //=================================== Defines ===================================
 
@@ -210,7 +196,8 @@ bool t3_map_snmp_oid_to_bacnet(const char* snmp_oid, t3_snmp_bacnet_mapping_t *m
     mapping->field = field;
 
     // Map to BACnet object type based on group and cfg_type
-    switch (group) {
+    switch (group)
+    {
         case T3_OBJECT_INPUT:
             mapping->bacnet_type = t3_cfgtype_to_bacnet_object(T3_CFGTYPE_BI); // Default to BI
             break;
@@ -226,8 +213,7 @@ bool t3_map_snmp_oid_to_bacnet(const char* snmp_oid, t3_snmp_bacnet_mapping_t *m
             return false;
     }
     
-    ESP_LOGI(TAG, "Mapped SNMP OID to BACnet: group=%u, field=%u, instance=%u, bacnet_type=%u",
-             group, field, instance, mapping->bacnet_type);
+    //ESP_LOGI(TAG, "Mapped SNMP OID to BACnet: group=%u, field=%u, instance=%u, bacnet_type=%u", group, field, instance, mapping->bacnet_type);
     
     return true;
 }
@@ -251,7 +237,7 @@ int t3_read_input_value(uint32_t instance, uint32_t field, t3_data_value_t *valu
         {
             value->int_value = (int32_t)instance;
             value->is_integer = true;
-            ESP_LOGI(TAG, "Read input %u index: %d", instance, value->int_value);
+            //ESP_LOGI(TAG, "Read input %u index: %d", instance, value->int_value);
         }
         break;
        
@@ -260,35 +246,35 @@ int t3_read_input_value(uint32_t instance, uint32_t field, t3_data_value_t *valu
             // Would need to get actual configuration
             value->int_value = T3_CFGTYPE_BI;
             value->is_integer = true;
-            ESP_LOGI(TAG, "Read input %u cfgType: %d", instance, value->int_value);
-            break;
+            //ESP_LOGI(TAG, "Read input %u cfgType: %d", instance, value->int_value);
         }
+            break;
         
         case T3_FIELD_ANALOG:
         {
-            float analog_val = (float)ptr.pin->value; //TODO:Analog_Input_Present_Value(instance);
+            float analog_val = (float)ptr.pin->value;
             value->analog_value = analog_val;
             value->float_value = analog_val;
             value->is_analog = true;
             value->is_float = true;
-            ESP_LOGI(TAG, "Read input %u analog value: %.2f", instance, analog_val);
+            //ESP_LOGI(TAG, "Read input %u analog value: %.2f", instance, analog_val);
         }
         break;
         
         case T3_FIELD_BINARY:
         {
-            int32_t binary_val = ptr.pin->value ; //TODO:Binary_Input_Present_Value(instance);
+            int32_t binary_val = ptr.pin->value;
             value->binary_value = binary_val;
             value->is_binary = true;
-            ESP_LOGI(TAG, "Read input %u binary value: %d", instance, binary_val);
+            //ESP_LOGI(TAG, "Read input %u binary value: %d %d", instance, binary_val, ptr.pin->value);
         }
         break;
         
         case T3_FIELD_DESC:
         {
-            memcpy(value->string_value, ptr.pin->description, strlen((const char *)ptr.pin->description));
+            memcpy(value->string_value, ptr.pin->label, strlen((const char *)ptr.pin->label));
             value->is_string = true;
-            ESP_LOGI(TAG, "Read input %u string value: %s", instance, value->string_value);
+            //ESP_LOGI(TAG, "Read input %u string value: %s", instance, value->string_value);
         }
         break;
         
@@ -296,13 +282,13 @@ int t3_read_input_value(uint32_t instance, uint32_t field, t3_data_value_t *valu
         {
             value->int_value = 1; //WIP //TODO
             value->is_integer = true;
-            ESP_LOGI(TAG, "Read input %u unit value: %d", instance, value->int_value);
+            //ESP_LOGI(TAG, "Read input %u unit value: %d", instance, value->int_value);
         }
         break;
 
         default:
         {
-            ESP_LOGI(TAG, "Invalid field %u for input instance %u", field, instance);
+            ESP_LOGW(TAG, "Invalid field %u for input instance %u", field, instance);
             return T3_ERROR_INVALID_FIELD;
         }
     }
@@ -343,7 +329,7 @@ int t3_read_output_value(uint32_t instance, uint32_t field, t3_data_value_t *val
             float analog_val = ptr.pout->value;
             value->analog_value = analog_val;
             value->is_analog = true;
-            ESP_LOGI(TAG, "Read output %u analog value: %.2f", instance, analog_val);
+            //ESP_LOGI(TAG, "Read output %u analog value: %.2f", instance, analog_val);
         }
         break;
 
@@ -352,7 +338,7 @@ int t3_read_output_value(uint32_t instance, uint32_t field, t3_data_value_t *val
             int32_t binary_val = ptr.pout->value;
             value->binary_value = binary_val;
             value->is_binary = true;
-            ESP_LOGI(TAG, "Read output %u binary value: %d", instance, binary_val);
+            //ESP_LOGI(TAG, "Read output %u binary value: %d", instance, binary_val);
         }
         break;
 
@@ -360,7 +346,7 @@ int t3_read_output_value(uint32_t instance, uint32_t field, t3_data_value_t *val
         {
             memcpy(value->string_value, ptr.pout->label, strlen((const char *)ptr.pout->label));
             value->is_string = true;
-            ESP_LOGI(TAG, "Read output %u string value: %s", instance, value->string_value);
+            //ESP_LOGI(TAG, "Read output %u string value: %s", instance, value->string_value);
         }
         break;
         
@@ -368,7 +354,7 @@ int t3_read_output_value(uint32_t instance, uint32_t field, t3_data_value_t *val
         {
             value->int_value = 7; //WIP //TODO
             value->is_integer = true;
-            ESP_LOGI(TAG, "Read input %u unit value: %d", instance, value->int_value);
+            //ESP_LOGI(TAG, "Read input %u unit value: %d", instance, value->int_value);
         }
         break;
 
@@ -424,7 +410,7 @@ int t3_read_variable_value(uint32_t instance, uint32_t field, t3_data_value_t *v
 
         case T3_FIELD_DESC:
         {
-            memcpy(value->string_value, ptr.pvar->description, strlen((const char *)ptr.pvar->description));
+            memcpy(value->string_value, ptr.pvar->label, strlen((const char *)ptr.pvar->label));
             value->is_string = true;
             ESP_LOGI(TAG, "Read variable %u string value: %s", instance, value->string_value);
         }
@@ -450,11 +436,11 @@ int t3_read_variable_value(uint32_t instance, uint32_t field, t3_data_value_t *v
 /* Write Functions */
 int t3_write_output_value(uint32_t instance, uint32_t field, const t3_data_value_t *value)
 {
+    ESP_LOGI(TAG, "t3_write_output_value: instance [%d], field [%d]", instance, field);
     if (!value || !t3_is_valid_instance(instance)) {
         return T3_ERROR_INVALID_INSTANCE;
     }
     
-    memset(value, 0, sizeof(t3_data_value_t));
     uint8_t priority = 1; // Default priority
     Str_points_ptr ptr = put_io_buf(OUT, instance);
     if (!ptr.pout) {
@@ -497,6 +483,11 @@ int t3_write_variable_value(uint32_t instance, uint32_t field, const t3_data_val
     }
     
     uint8_t priority = 1; // Default priority
+    Str_points_ptr ptr = put_io_buf(VAR, instance);
+    if (!ptr.pvar) {
+        return T3_ERROR_NOT_FOUND;
+    }
+
     switch (field) {
         case T3_FIELD_INTIGER:
             if (value->is_integer) {
@@ -513,6 +504,13 @@ int t3_write_variable_value(uint32_t instance, uint32_t field, const t3_data_val
                 if (!TemcoVars_Present_Value_Set(instance, value->float_value, priority)) {
                   return T3_ERROR_WRITE_ONLY;
                 }
+                return T3_SUCCESS;
+            }
+            break;
+        case T3_FIELD_DESC:
+            if (value->is_string) {
+                ESP_LOGI(TAG, "Write variable %u description: %s", instance, value->string_value);
+                memcpy(ptr.pvar->label, value->string_value, strlen((const char *)value->string_value));
                 return T3_SUCCESS;
             }
             break;
