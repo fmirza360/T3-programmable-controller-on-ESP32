@@ -15,10 +15,8 @@
 
 //=================================== Defines ===================================
 // SNMP agent configuration.
-#define ENTERPRISE_OID  "P.TEMCO.30"  // used as sysObjectID and in trap
 #define RO_COMMUNITY    "public"				  
 #define RW_COMMUNITY    "private"
-#define TRAP_DST_ADDR   "192.168.31.118"  // Destination address for SNMP traps
 
 //=================================== Variables =================================
 
@@ -82,12 +80,22 @@ void snmp_app_init(void)
 static void snmp_agent_task(void *pvParameters)
 {
     vTaskDelay(3000 / portTICK_PERIOD_MS); // wait for network to be ready
+
+    // Initialize SNMP agent framework
     initSnmpAgent(SNMP_PORT, ENTERPRISE_OID, RO_COMMUNITY, RW_COMMUNITY);
+
+    // Initialize MIB tree
     initMibTree();
 
-    //static const uint32_t my_trap_oid[] = {1,3,6,1,4,1,TEMCO,1,0};
-    //snmp_send_v2c_trap(TRAP_DST_ADDR, "public", my_trap_oid, 9, esp_log_timestamp());
+    // Send SNMP cold start trap
+    const char* my_ip = "10.123.89.105"; // Use esp_netif_get_ip_info to get this dynamically
+    const char* manager_ip = "10.123.89.104";
+    send_snmp_trap_cold_start(my_ip, manager_ip);
 
+    // Send custom trap
+    snmp_trap_enterprise(my_ip, manager_ip, "this is custom trap!!!");
+
+    // Process SNMP requests
     for (;;)
     {
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -104,7 +112,7 @@ static void snmp_agent_task(void *pvParameters)
 void snmp_agent_init(void)
 {
     ESP_LOGI(TAG, "T3 SNMP agent initialized");
-    xTaskCreate(snmp_agent_task, "snmp_agent_task", 4096, NULL, 5, NULL);
+    xTaskCreate(snmp_agent_task, "snmp_agent_task", 4096 + 4096, NULL, 5, NULL);
 }
 
 // Initialize MIB tree

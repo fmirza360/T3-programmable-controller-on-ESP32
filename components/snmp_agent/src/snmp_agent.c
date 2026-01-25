@@ -21,12 +21,12 @@
 
 #include "mbedtls/asn1.h"
 #include "mbedtls/asn1write.h"
+#include "mibutil.h"
 
 static const char *TAG = "SnmpAgent";
 
-#include "mibutil.h"
 char hostIpAddr[16], remoteIpAddr[16];
-Boolean debug = TRUE;
+Boolean debug = FALSE;
 
 uint16_t remotePort;
 char *enterpriseOID;
@@ -120,6 +120,7 @@ int snmpSet(MIB *thismib, unsigned char dataType, void *val, int vlen)
 					return error_code;
 			}
 			else {
+				ESP_LOGI(TAG, "intValue: %d", intval);
 				thismib->dataLen = INT_SIZE;
 				thismib->u.intval = intval;
 			}
@@ -480,6 +481,13 @@ int initSnmpAgent( int port, char *entoid, char *rocommstr, char *rwcommstr )
 	if (debug)
 		printf ("Local system host address is %s\n", hostIpAddr);
 	snmpfd = socket(PF_INET, SOCK_DGRAM, 0);
+
+	// Set timeout
+    struct timeval timeout;
+    timeout.tv_sec = 3;
+    timeout.tv_usec = 0;
+    setsockopt (snmpfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
+
 	servaddr.sin_family = AF_INET;
 	servaddr.sin_addr.s_addr = INADDR_ANY;
 	servaddr.sin_port = htons(port);
@@ -556,11 +564,10 @@ int vblistParse(int reqType, struct messageStruct *vblist)
 /*
  * Builds a trap and returns its length.
  */
-
-int trapBuild(struct messageStruct *trap, char *entoid, char *agentaddr, int gen, int spec, struct messageStruct *vblist, int version)
+int snmp_v1_trap_build(struct messageStruct *trap, char *entoid, char *agentaddr, int gen, int spec, struct messageStruct *vblist)
 {
 	/* PDU header */
-	trap->buffer[0] = version == TRAP_PACKET_V1 ? TRAP_PACKET_V1 : TRAP_PACKET_V2C;
+	trap->buffer[0] = TRAP_PACKET_V1;
 	trap->buffer[1] = '\0';  /* Set length field to zero first */
 
 	/* Enterprise OID */
@@ -612,7 +619,7 @@ int trapBuild(struct messageStruct *trap, char *entoid, char *agentaddr, int gen
 /*
  * Send a trap
  */
-void trapSend(struct messageStruct *trap, char *dst, uint16_t port_no, char *comm_str, int version)
+void snmp_v1_trap_send(struct messageStruct *trap, char *dst, uint16_t port_no, char *comm_str)
 {
 	int snmpfd;
 	struct sockaddr_in servaddr, to;
@@ -626,9 +633,9 @@ void trapSend(struct messageStruct *trap, char *dst, uint16_t port_no, char *com
 	trap->buffer[1] = '\0';  /* Set length field to zero first */
 
 	/* Version 1 */
-	trap->buffer[2] = version == TRAP_PACKET_V1 ? SNMP_V1 : SNMP_V2C;
+	trap->buffer[2] = SNMP_V1;
 	trap->buffer[3] = '\x01';  /* Version length field assumed to be of 1 byte */
-	trap->buffer[4] = version == TRAP_PACKET_V1 ? '\x00' : '\x01';  /* Version value */
+	trap->buffer[4] = '\x00';  /* Version value */
 
 	/* Community string */
 	trap->buffer[5] = OCTET_STRING;
@@ -660,9 +667,6 @@ void trapSend(struct messageStruct *trap, char *dst, uint16_t port_no, char *com
 }
 
 //=================================================
-static const uint32_t oid_sysUpTime[]   = {1,3,6,1,2,1,1,3,0};
-static const uint32_t oid_snmpTrapOID[] = {1,3,6,1,6,3,1,1,4,1,0};
-
 size_t snmp_encode_oid(const uint32_t *oid, uint8_t oid_len, uint8_t *buf, size_t buf_len)
 {
     if (oid_len < 2 || buf_len < 1)
@@ -714,269 +718,6 @@ void print_hex_dump(const char *tag, const uint8_t *data, int len)
     ESP_LOGI(tag, "%s", buf);
 }
 
-void snmp_send_v2c_trap(const char *dest_ip,
-                        const char *community,
-                        const uint32_t *trap_oid,
-                        uint8_t trap_oid_len,
-                        uint32_t sysuptime_ticks)
-{
-    int ret;
-    int sock;
-    struct sockaddr_in to;
-    unsigned char buf[512];
-    unsigned char *p = buf + sizeof(buf);
-    size_t len = 0, vbl_len = 0;
-    static uint32_t inform_req_id = 100;
-
-    sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (sock < 0) {
-        ESP_LOGE(TAG, "INFORM: socket failed");
-        return -1;
-    }
-
-    memset(&to, 0, sizeof(to));
-    to.sin_family = AF_INET;
-    to.sin_port   = htons(162);
-    inet_aton(dest_ip, &to.sin_addr);
-
-    /* ===================================================== */
-    /* VarBind 2: snmpTrapOID.0                               */
-    /* ===================================================== */
-    {
-        size_t vb_len = 0;
-
-        uint8_t val_oid[32];
-        size_t val_oid_len = snmp_encode_oid(trap_oid, trap_oid_len, val_oid, sizeof(val_oid));
-
-        MBEDTLS_ASN1_CHK_ADD(vb_len, mbedtls_asn1_write_raw_buffer(&p, buf, val_oid, val_oid_len));
-        MBEDTLS_ASN1_CHK_ADD(vb_len, mbedtls_asn1_write_len(&p, buf, val_oid_len));
-        MBEDTLS_ASN1_CHK_ADD(vb_len, mbedtls_asn1_write_tag(&p, buf, MBEDTLS_ASN1_OID));
-
-        uint8_t oid_buf[32];
-        size_t oid_len = snmp_encode_oid(oid_snmpTrapOID, 11, oid_buf, sizeof(oid_buf));
-
-        MBEDTLS_ASN1_CHK_ADD(vb_len, mbedtls_asn1_write_raw_buffer(&p, buf, oid_buf, oid_len));
-        MBEDTLS_ASN1_CHK_ADD(vb_len, mbedtls_asn1_write_len(&p, buf, oid_len));
-        MBEDTLS_ASN1_CHK_ADD(vb_len, mbedtls_asn1_write_tag(&p, buf, MBEDTLS_ASN1_OID));
-
-        MBEDTLS_ASN1_CHK_ADD(vbl_len, mbedtls_asn1_write_len(&p, buf, vb_len));
-        MBEDTLS_ASN1_CHK_ADD(vbl_len, mbedtls_asn1_write_tag(&p, buf, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE));
-        vbl_len += vb_len;
-    }
-
-    /* ===================================================== */
-    /* VarBind 1: sysUpTime.0 (MUST BE FIRST)                */
-    /* ===================================================== */
-    {
-        size_t vb_len = 0;
-
-        MBEDTLS_ASN1_CHK_ADD(vb_len, mbedtls_asn1_write_int(&p, buf, sysuptime_ticks));
-        *p = 0x43; /* TimeTicks */
-
-        uint8_t oid_buf[32];
-        size_t oid_len = snmp_encode_oid(oid_sysUpTime, 9, oid_buf, sizeof(oid_buf));
-
-        MBEDTLS_ASN1_CHK_ADD(vb_len,
-            mbedtls_asn1_write_raw_buffer(&p, buf, oid_buf, oid_len));
-        MBEDTLS_ASN1_CHK_ADD(vb_len,
-            mbedtls_asn1_write_len(&p, buf, oid_len));
-        MBEDTLS_ASN1_CHK_ADD(vb_len,
-            mbedtls_asn1_write_tag(&p, buf, MBEDTLS_ASN1_OID));
-
-        MBEDTLS_ASN1_CHK_ADD(vbl_len,
-            mbedtls_asn1_write_len(&p, buf, vb_len));
-        MBEDTLS_ASN1_CHK_ADD(vbl_len,
-            mbedtls_asn1_write_tag(&p, buf,
-                MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE));
-        vbl_len += vb_len;
-    }
-
-    /* VarBindList */
-    MBEDTLS_ASN1_CHK_ADD(len,
-        mbedtls_asn1_write_len(&p, buf, vbl_len));
-    MBEDTLS_ASN1_CHK_ADD(len,
-        mbedtls_asn1_write_tag(&p, buf,
-            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE));
-    len += vbl_len;
-
-    MBEDTLS_ASN1_CHK_ADD(len, mbedtls_asn1_write_int(&p, buf, 0));
-    MBEDTLS_ASN1_CHK_ADD(len, mbedtls_asn1_write_int(&p, buf, 0));
-    MBEDTLS_ASN1_CHK_ADD(len,
-        mbedtls_asn1_write_int(&p, buf, inform_req_id++));
-
-    /* INFORM PDU (A6) */
-    MBEDTLS_ASN1_CHK_ADD(len,
-        mbedtls_asn1_write_len(&p, buf, len));
-    MBEDTLS_ASN1_CHK_ADD(len,
-        mbedtls_asn1_write_tag(&p, buf,
-            MBEDTLS_ASN1_CONTEXT_SPECIFIC |
-            MBEDTLS_ASN1_CONSTRUCTED | 7));
-
-    MBEDTLS_ASN1_CHK_ADD(len,
-        mbedtls_asn1_write_octet_string(&p, buf,
-            (const unsigned char *)community, strlen(community)));
-    MBEDTLS_ASN1_CHK_ADD(len,
-        mbedtls_asn1_write_int(&p, buf, 1));
-
-    MBEDTLS_ASN1_CHK_ADD(len,
-        mbedtls_asn1_write_len(&p, buf, len));
-    MBEDTLS_ASN1_CHK_ADD(len,
-        mbedtls_asn1_write_tag(&p, buf,
-            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE));
-
-    /* ---------- Send ---------- */
-    ESP_LOGI(TAG, "Trap dst=%s port=%d", inet_ntoa(to.sin_addr), ntohs(to.sin_port));
-    print_hex_dump(TAG, p, len);
-
-    ssize_t size = sendto(sock, p, len, 0, (struct sockaddr *)&to, sizeof(to));
-    if (size < 0) {
-        ESP_LOGE(TAG, "TRAP: sendto failed");
-    }
-    close(sock);
-    ESP_LOGI(TAG, "SNMP v2c TRAP sent : %d", size);
-}
-
-int snmp_send_v2c_inform(const char *dest_ip,
-                         const char *community,
-                         const uint32_t *trap_oid,
-                         uint8_t trap_oid_len,
-                         uint32_t sysuptime_ticks)
-{
-    int ret;
-    int sock;
-    struct sockaddr_in to;
-    unsigned char buf[512];
-    unsigned char *p = buf + sizeof(buf);
-    size_t len = 0, vbl_len = 0;
-    static uint32_t inform_req_id = 100;
-
-    sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (sock < 0) {
-        ESP_LOGE(TAG, "INFORM: socket failed");
-        return -1;
-    }
-
-    memset(&to, 0, sizeof(to));
-    to.sin_family = AF_INET;
-    to.sin_port   = htons(162);
-    inet_aton(dest_ip, &to.sin_addr);
-
-    /* ===================================================== */
-    /* VarBind 2: snmpTrapOID.0                               */
-    /* ===================================================== */
-    {
-        size_t vb_len = 0;
-
-        uint8_t val_oid[32];
-        size_t val_oid_len =
-            snmp_encode_oid(trap_oid, trap_oid_len, val_oid, sizeof(val_oid));
-
-        MBEDTLS_ASN1_CHK_ADD(vb_len,
-            mbedtls_asn1_write_raw_buffer(&p, buf, val_oid, val_oid_len));
-        MBEDTLS_ASN1_CHK_ADD(vb_len,
-            mbedtls_asn1_write_len(&p, buf, val_oid_len));
-        MBEDTLS_ASN1_CHK_ADD(vb_len,
-            mbedtls_asn1_write_tag(&p, buf, MBEDTLS_ASN1_OID));
-
-        uint8_t oid_buf[32];
-        size_t oid_len =
-            snmp_encode_oid(oid_snmpTrapOID, 11, oid_buf, sizeof(oid_buf));
-
-        MBEDTLS_ASN1_CHK_ADD(vb_len,
-            mbedtls_asn1_write_raw_buffer(&p, buf, oid_buf, oid_len));
-        MBEDTLS_ASN1_CHK_ADD(vb_len,
-            mbedtls_asn1_write_len(&p, buf, oid_len));
-        MBEDTLS_ASN1_CHK_ADD(vb_len,
-            mbedtls_asn1_write_tag(&p, buf, MBEDTLS_ASN1_OID));
-
-        MBEDTLS_ASN1_CHK_ADD(vbl_len,
-            mbedtls_asn1_write_len(&p, buf, vb_len));
-        MBEDTLS_ASN1_CHK_ADD(vbl_len,
-            mbedtls_asn1_write_tag(&p, buf,
-                MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE));
-        vbl_len += vb_len;
-    }
-
-    /* ===================================================== */
-    /* VarBind 1: sysUpTime.0 (MUST BE FIRST)                */
-    /* ===================================================== */
-    {
-        size_t vb_len = 0;
-
-        MBEDTLS_ASN1_CHK_ADD(vb_len,
-            mbedtls_asn1_write_int(&p, buf, sysuptime_ticks));
-        *p = 0x43; /* TimeTicks */
-
-        uint8_t oid_buf[32];
-        size_t oid_len =
-            snmp_encode_oid(oid_sysUpTime, 9, oid_buf, sizeof(oid_buf));
-
-        MBEDTLS_ASN1_CHK_ADD(vb_len,
-            mbedtls_asn1_write_raw_buffer(&p, buf, oid_buf, oid_len));
-        MBEDTLS_ASN1_CHK_ADD(vb_len,
-            mbedtls_asn1_write_len(&p, buf, oid_len));
-        MBEDTLS_ASN1_CHK_ADD(vb_len,
-            mbedtls_asn1_write_tag(&p, buf, MBEDTLS_ASN1_OID));
-
-        MBEDTLS_ASN1_CHK_ADD(vbl_len,
-            mbedtls_asn1_write_len(&p, buf, vb_len));
-        MBEDTLS_ASN1_CHK_ADD(vbl_len,
-            mbedtls_asn1_write_tag(&p, buf,
-                MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE));
-        vbl_len += vb_len;
-    }
-
-    /* VarBindList */
-    MBEDTLS_ASN1_CHK_ADD(len,
-        mbedtls_asn1_write_len(&p, buf, vbl_len));
-    MBEDTLS_ASN1_CHK_ADD(len,
-        mbedtls_asn1_write_tag(&p, buf,
-            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE));
-    len += vbl_len;
-
-    MBEDTLS_ASN1_CHK_ADD(len, mbedtls_asn1_write_int(&p, buf, 0));
-    MBEDTLS_ASN1_CHK_ADD(len, mbedtls_asn1_write_int(&p, buf, 0));
-    MBEDTLS_ASN1_CHK_ADD(len,
-        mbedtls_asn1_write_int(&p, buf, inform_req_id++));
-
-    /* INFORM PDU (A6) */
-    MBEDTLS_ASN1_CHK_ADD(len,
-        mbedtls_asn1_write_len(&p, buf, len));
-    MBEDTLS_ASN1_CHK_ADD(len,
-        mbedtls_asn1_write_tag(&p, buf,
-            MBEDTLS_ASN1_CONTEXT_SPECIFIC |
-            MBEDTLS_ASN1_CONSTRUCTED | 6));
-
-    MBEDTLS_ASN1_CHK_ADD(len,
-        mbedtls_asn1_write_octet_string(&p, buf,
-            (const unsigned char *)community, strlen(community)));
-    MBEDTLS_ASN1_CHK_ADD(len,
-        mbedtls_asn1_write_int(&p, buf, 1));
-
-    MBEDTLS_ASN1_CHK_ADD(len,
-        mbedtls_asn1_write_len(&p, buf, len));
-    MBEDTLS_ASN1_CHK_ADD(len,
-        mbedtls_asn1_write_tag(&p, buf,
-            MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE));
-
-    sendto(sock, p, len, 0, (struct sockaddr *)&to, sizeof(to));
-
-    /* ===================================================== */
-    /* WAIT FOR RESPONSE                                     */
-    /* ===================================================== */
-    /* Set receive timeout */
-    struct timeval tv = {5, 0};
-    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-
-    unsigned char rx[512] = {0};
-    int rxlen = recv(sock, rx, sizeof(rx), 0);
-    close(sock);
-
-    if (rxlen > 0) {
-        ESP_LOGI(TAG, "INFORM acknowledged (%d bytes)", rxlen);
-        return 0;
-    }
-
-    ESP_LOGW(TAG, "INFORM timeout - no response");
-    return -1;
-}
+//===============================
+// End of file
+//===============================

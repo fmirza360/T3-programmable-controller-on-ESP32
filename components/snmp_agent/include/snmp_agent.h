@@ -56,24 +56,10 @@ uint32_t sysUpTime( void );
 int vblistParse(int reqType, struct messageStruct *vblist);
 
 /* Builds a trap and returns its length. */
-int trapBuild(struct messageStruct *trap, char *entoid, char *agentaddr, int gen, int spec, struct messageStruct *vblist, int version);
+int snmp_v1_trap_build(struct messageStruct *trap, char *entoid, char *agentaddr, int gen, int spec, struct messageStruct *vblist);
 
 /* Sends a trap */
-void trapSend(struct messageStruct *trap, char *dst, uint16_t port_no, char *commstr, int version);
-
-/* Sends a trap v2c */
-void snmp_send_v2c_trap(const char *dest_ip,
-                        const char *community,
-                        const uint32_t *trap_oid,
-                        uint8_t trap_oid_len,
-                        uint32_t sysuptime_ticks);
-/* Sends a inform v2c */
-int snmp_send_v2c_inform(const char *dest_ip,
-                         const char *community,
-                         const uint32_t *trap_oid,
-                         uint8_t trap_oid_len,
-                         uint32_t sysuptime_ticks);
-
+void snmp_v1_trap_send(struct messageStruct *trap, char *dst, uint16_t port_no, char *commstr);
 
 #ifdef __cplusplus
 }

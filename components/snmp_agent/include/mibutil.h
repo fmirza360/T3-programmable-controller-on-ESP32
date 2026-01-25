@@ -6,7 +6,6 @@
 #ifndef _MIBUTIL_H
 #define _MIBUTIL_H
 
-#include <stdio.h>
 #include "octet.h"
 #include "miblist.h"
 #include "varbind.h"

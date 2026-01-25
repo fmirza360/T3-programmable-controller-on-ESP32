@@ -125,7 +125,7 @@ typedef enum {
 
 /* Point Mapping Structure */
 typedef struct {
-    uint32_t object_type;        // T3_OBJECT_INPUT/OUTPUT/VARIABLE
+    uint32_t object_type;       // T3_OBJECT_INPUT/OUTPUT/VARIABLE
     uint32_t instance;          // 0-63
     uint32_t cfg_type;          // T3_CFGTYPE_*
     uint32_t field;             // 0-5
