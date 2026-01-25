@@ -212,7 +212,7 @@ bool t3_map_snmp_oid_to_bacnet(const char* snmp_oid, t3_snmp_bacnet_mapping_t *m
             mapping->is_valid = false;
             return false;
     }
-    
+
     //ESP_LOGI(TAG, "Mapped SNMP OID to BACnet: group=%u, field=%u, instance=%u, bacnet_type=%u", group, field, instance, mapping->bacnet_type);
     
     return true;
@@ -226,7 +226,7 @@ int t3_read_input_value(uint32_t instance, uint32_t field, t3_data_value_t *valu
     }
     
     memset(value, 0, sizeof(t3_data_value_t));
-    
+
     Str_points_ptr ptr = put_io_buf(IN, instance);
     if (!ptr.pin) {
         return T3_ERROR_NOT_FOUND;
@@ -248,7 +248,7 @@ int t3_read_input_value(uint32_t instance, uint32_t field, t3_data_value_t *valu
             value->is_integer = true;
             //ESP_LOGI(TAG, "Read input %u cfgType: %d", instance, value->int_value);
         }
-            break;
+        break;
         
         case T3_FIELD_ANALOG:
         {
@@ -367,13 +367,15 @@ int t3_read_output_value(uint32_t instance, uint32_t field, t3_data_value_t *val
 
 int t3_read_variable_value(uint32_t instance, uint32_t field, t3_data_value_t *value)
 {
-    if (!value || !t3_is_valid_instance(instance)) {
+    if (!value || !t3_is_valid_instance(instance))
+    {
         return T3_ERROR_INVALID_INSTANCE;
     }
     
     memset(value, 0, sizeof(t3_data_value_t));
     Str_points_ptr ptr = put_io_buf(VAR, instance);
-    if (!ptr.pvar) {
+    if (!ptr.pvar)
+    {
         return T3_ERROR_NOT_FOUND;
     }
     
@@ -418,7 +420,7 @@ int t3_read_variable_value(uint32_t instance, uint32_t field, t3_data_value_t *v
         
         case T3_FIELD_UNITS:
         {
-            value->int_value = 0; //WIP //TODO
+            value->int_value = 10; //WIP //TODO
             value->is_integer = true;
             ESP_LOGI(TAG, "Read variable %u unit value: %d", instance, value->int_value);
         }
@@ -436,87 +438,121 @@ int t3_read_variable_value(uint32_t instance, uint32_t field, t3_data_value_t *v
 /* Write Functions */
 int t3_write_output_value(uint32_t instance, uint32_t field, const t3_data_value_t *value)
 {
-    ESP_LOGI(TAG, "t3_write_output_value: instance [%d], field [%d]", instance, field);
-    if (!value || !t3_is_valid_instance(instance)) {
+    if (!value || !t3_is_valid_instance(instance))
+    {
         return T3_ERROR_INVALID_INSTANCE;
     }
-    
+
     uint8_t priority = 1; // Default priority
     Str_points_ptr ptr = put_io_buf(OUT, instance);
-    if (!ptr.pout) {
+    if (!ptr.pout)
+    {
         return T3_ERROR_NOT_FOUND;
     }
 
-    switch (field) {
+    switch (field)
+    {
         case T3_FIELD_ANALOG:
-            if (value->is_analog) {
+        {
+            if (value->is_analog)
+            {
                 ESP_LOGI(TAG, "Write output %u analog value: %.2f", instance, value->analog_value);
                 ptr.pout->value = value->analog_value;
                 return T3_SUCCESS;
             }
-            break;
+        }
+        break;
+
         case T3_FIELD_BINARY:
-            if (value->is_binary) {
+        {
+            if (value->is_binary)
+            {
                 ESP_LOGI(TAG, "Write output %u binary value: %d", instance, value->binary_value);
                 ptr.pout->value = value->binary_value;
                 return T3_SUCCESS;
             }
-            break;
+        }
+        break;
+        
         case T3_FIELD_DESC:
-            if (value->is_string) {
+        {
+            if (value->is_string)
+            {
                 ESP_LOGI(TAG, "Write output %u description: %s", instance, value->string_value);
+                memset(ptr.pout->label, 0, sizeof(ptr.pout->label));
                 memcpy(ptr.pout->label, value->string_value, strlen((const char *)value->string_value));
                 return T3_SUCCESS;
             }
-            break;
+        }
+        break;
+        
         default:
+        {
             return T3_ERROR_INVALID_FIELD;
+        }
     }
-    
     return T3_ERROR_TYPE_MISMATCH;
 }
 
 int t3_write_variable_value(uint32_t instance, uint32_t field, const t3_data_value_t *value)
 {
-    if (!value || !t3_is_valid_instance(instance)) {
+    if (!value || !t3_is_valid_instance(instance))
+    {
         return T3_ERROR_INVALID_INSTANCE;
     }
     
     uint8_t priority = 1; // Default priority
     Str_points_ptr ptr = put_io_buf(VAR, instance);
-    if (!ptr.pvar) {
+    if (!ptr.pvar)
+    {
         return T3_ERROR_NOT_FOUND;
     }
 
-    switch (field) {
+    switch (field)
+    {
         case T3_FIELD_INTIGER:
+        {
             if (value->is_integer) {
                 ESP_LOGI(TAG, "Write variable %u int value: %d", instance, value->int_value);
-                if (!TemcoVars_Present_Value_Set(instance, (float)value->int_value, priority)) {
-                  return T3_ERROR_WRITE_ONLY;
+                if (!TemcoVars_Present_Value_Set(instance, (float)value->int_value, priority))
+                {
+                    return T3_ERROR_WRITE_ONLY;
                 }
                 return T3_SUCCESS;
             }
-            break;
+        }
+        break;
+        
         case T3_FIELD_REAL:
-            if (value->is_float) {
+        {
+            if (value->is_float)
+            {
                 ESP_LOGI(TAG, "Write variable %u float value: %.2f", instance, value->float_value);
-                if (!TemcoVars_Present_Value_Set(instance, value->float_value, priority)) {
-                  return T3_ERROR_WRITE_ONLY;
+                if (!TemcoVars_Present_Value_Set(instance, value->float_value, priority))
+                {
+                    return T3_ERROR_WRITE_ONLY;
                 }
                 return T3_SUCCESS;
             }
-            break;
+        }
+        break;
+        
         case T3_FIELD_DESC:
-            if (value->is_string) {
+        {
+            if (value->is_string)
+            {
                 ESP_LOGI(TAG, "Write variable %u description: %s", instance, value->string_value);
+                memset(ptr.pvar->label, 0, sizeof(ptr.pvar->label));
                 memcpy(ptr.pvar->label, value->string_value, strlen((const char *)value->string_value));
                 return T3_SUCCESS;
             }
-            break;
+        }
+        break;
+        
         default:
+        {
             return T3_ERROR_INVALID_FIELD;
+        }
     }
-    
     return T3_ERROR_TYPE_MISMATCH;
 }

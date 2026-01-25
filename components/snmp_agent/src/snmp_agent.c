@@ -17,7 +17,7 @@
 #include <unistd.h>
 
 #include "esp_log.h"
-#include "SnmpAgent.h"
+#include "snmp_agent.h"
 
 #include "mbedtls/asn1.h"
 #include "mbedtls/asn1write.h"

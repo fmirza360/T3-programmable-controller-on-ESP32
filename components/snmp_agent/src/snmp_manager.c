@@ -72,7 +72,7 @@
 #include <netdb.h>
 #include <unistd.h>
 
-#include "SnmpMgr.h"
+#include "snmp_manager.h"
 
 int snmpfd;
 struct sockaddr_in cliaddr;
