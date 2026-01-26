@@ -13,6 +13,9 @@ extern "C" {
 #define T3_SHORT_NAME_LENGTH          20
 #define T3_MAX_STRING_LENGTH          64
 
+#define DIGITAL_VALUE                  0
+#define ANALOG_VALUE                   1
+
 /* Error Codes */
 #define T3_SUCCESS                    0
 #define T3_ERROR_INVALID_INSTANCE    -1
@@ -162,7 +165,8 @@ int t3_read_output_value(uint32_t instance, uint32_t field, t3_data_value_t *val
 int t3_write_output_value(uint32_t instance, uint32_t field, const t3_data_value_t *value);
 int t3_write_variable_value(uint32_t instance, uint32_t field, const t3_data_value_t *value);
 
-void test_snmp_bacnet_mapping(void);
+int fetch_config_type(t3_object_type_t type, int digital_analog, int range);
+int fetch_units_type(t3_object_type_t type, int digital_analog, int range);
 
 #ifdef __cplusplus
 }

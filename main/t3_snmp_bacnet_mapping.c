@@ -243,8 +243,7 @@ int t3_read_input_value(uint32_t instance, uint32_t field, t3_data_value_t *valu
        
         case T3_FIELD_CFGTYPE:
         {
-            // Would need to get actual configuration
-            value->int_value = T3_CFGTYPE_BI;
+            value->int_value = fetch_config_type(T3_OBJECT_INPUT, ptr.pin->digital_analog, ptr.pin->range);
             value->is_integer = true;
             //ESP_LOGI(TAG, "Read input %u cfgType: %d", instance, value->int_value);
         }
@@ -280,7 +279,7 @@ int t3_read_input_value(uint32_t instance, uint32_t field, t3_data_value_t *valu
         
         case T3_FIELD_UNITS:
         {
-            value->int_value = 1; //WIP //TODO
+            value->int_value = fetch_units_type(T3_OBJECT_INPUT, ptr.pin->digital_analog, ptr.pin->range);
             value->is_integer = true;
             //ESP_LOGI(TAG, "Read input %u unit value: %d", instance, value->int_value);
         }
@@ -319,7 +318,7 @@ int t3_read_output_value(uint32_t instance, uint32_t field, t3_data_value_t *val
         
         case T3_FIELD_CFGTYPE:
         {
-            value->int_value = T3_CFGTYPE_BO;
+            value->int_value = fetch_config_type(T3_OBJECT_INPUT, ptr.pin->digital_analog, ptr.pin->range);
             value->is_integer = true;
         }
         break;
@@ -352,7 +351,7 @@ int t3_read_output_value(uint32_t instance, uint32_t field, t3_data_value_t *val
         
         case T3_FIELD_UNITS:
         {
-            value->int_value = 7; //WIP //TODO
+            value->int_value = fetch_units_type(T3_OBJECT_OUTPUT, ptr.pout->digital_analog, ptr.pout->range);
             value->is_integer = true;
             //ESP_LOGI(TAG, "Read input %u unit value: %d", instance, value->int_value);
         }
@@ -390,8 +389,7 @@ int t3_read_variable_value(uint32_t instance, uint32_t field, t3_data_value_t *v
         
         case T3_FIELD_CFGTYPE:
         {
-            // Would need to get actual configuration
-            value->int_value = T3_CFGTYPE_VAR_FLOAT;
+            value->int_value = fetch_config_type(T3_OBJECT_VARIABLE, ptr.pvar->digital_analog, ptr.pvar->range);
             value->is_integer = true;
         }
         break;
@@ -420,7 +418,7 @@ int t3_read_variable_value(uint32_t instance, uint32_t field, t3_data_value_t *v
         
         case T3_FIELD_UNITS:
         {
-            value->int_value = 10; //WIP //TODO
+            value->int_value = fetch_units_type(T3_OBJECT_VARIABLE, ptr.pvar->digital_analog, ptr.pvar->range);
             value->is_integer = true;
             ESP_LOGI(TAG, "Read variable %u unit value: %d", instance, value->int_value);
         }
@@ -555,4 +553,168 @@ int t3_write_variable_value(uint32_t instance, uint32_t field, const t3_data_val
         }
     }
     return T3_ERROR_TYPE_MISMATCH;
+}
+
+int fetch_config_type(t3_object_type_t type, int digital_analog, int range)
+{
+    if(type == T3_OBJECT_INPUT)
+    {
+       if(digital_analog == DIGITAL_VALUE)
+        {
+            return T3_CFGTYPE_BI;
+        }
+        else
+        {
+            if((range == V0_5) || (range == P0_100_0_5V))
+            {
+                return T3_CFGTYPE_AI_0_5V;
+            }
+            else if((range == V0_10_IN) || (range == P0_100_0_10V))
+            {
+                return T3_CFGTYPE_AI_0_10V;
+            }
+            else if((range == I0_20ma) || (range == P0_100_4_20ma))
+            {
+                return T3_CFGTYPE_AI_4_20MA;
+            }
+            else if(range == I0_100Amps)
+            {
+                return T3_CFGTYPE_AI_0_100;
+            }
+            else
+            {
+                return T3_CFGTYPE_AI_NEG10_10V;
+            }
+        }
+    }
+    else if(type == T3_OBJECT_OUTPUT)
+    {
+       if(digital_analog == DIGITAL_VALUE)
+        {
+            return T3_CFGTYPE_BO;
+        }
+        else
+        {
+            if(range == V0_10)
+            {
+                return T3_CFGTYPE_AO_0_10V;
+            }
+            else if(range == I_0_20ma)
+            {
+                return T3_CFGTYPE_AO_4_20MA;
+            }
+            else if(range == P0_20psi)
+            {
+                return T3_CFGTYPE_AO_4_20MA; //TBD: is it correct ? specs 4.1 says nothing
+            }
+            else
+            {
+                return T3_CFGTYPE_AO_0_100;
+            }
+        }
+    }
+    else if(type == T3_OBJECT_VARIABLE)
+    {
+        if(range == Sec || range == Hours || range == Days || range == Min)
+		{
+            return T3_CFGTYPE_VAR_INT;
+        }
+        else
+        {
+            return T3_CFGTYPE_VAR_FLOAT;
+            //return T3_CFGTYPE_VAR_STRING;  //TBD: do we have any examples for string var ?
+        }
+    }
+    return 0;
+}
+
+int fetch_units_type(t3_object_type_t type, int digital_analog, int range)
+{
+    if(digital_analog == DIGITAL_VALUE)
+    {
+        return T3_UNITS_NONE;
+    }
+    else if(type == T3_OBJECT_INPUT)
+    {
+        switch(range)
+        {
+            case Y3K_40_150DegC:
+            case R10K_40_120DegC:
+            case R3K_40_150DegC:
+            case KM10K_40_120DegC:
+            case PT1000_200_300DegC:
+                return T3_UNITS_CELSIUS;
+            case Y3K_40_300DegF:
+            case R10K_40_250DegF:
+            case R3K_40_300DegF:
+            case KM10K_40_250DegF:
+            case PT1000_200_570DegF:
+                return T3_UNITS_FAHRENHEIT;
+            case V0_5:
+            case V0_10_IN:
+            case P0_100_0_10V:
+            case P0_100_0_5V:
+                return T3_UNITS_VOLTS;
+            case I0_20ma:
+            case I0_100Amps:
+            case P0_100_4_20ma:
+                return T3_UNITS_MILLIAMPS;
+            case Frequence:
+                return T3_UNITS_HERTZ;
+            default:
+                return T3_UNITS_NONE;
+        }
+    }
+    else if(type == T3_OBJECT_OUTPUT)
+    {
+        switch(range)
+        {
+            case V0_10:
+            case P0_100_0_10V:
+                return T3_UNITS_VOLTS;
+            case I_0_20ma:
+            case P0_100_4_20ma:
+            case P0_20psi:
+                return T3_UNITS_MILLIAMPS;
+            case P0_100:
+            case P0_100_Close:
+            case P0_100_Open:
+            case P0_100_PWM:
+                return T3_UNITS_PERCENT;
+            default:
+                return T3_UNITS_NONE;
+        }
+    }
+    else if(type == T3_OBJECT_VARIABLE)
+    {
+        switch(range)
+        {
+            case Sec:
+            case Min:
+            case Hours:
+            case Days:
+            case time_unit:
+                return T3_UNITS_SECONDS;
+            case degC:
+                return T3_UNITS_CELSIUS;
+            case degF:
+                return T3_UNITS_FAHRENHEIT;
+            case Volts:
+            case KV:
+                return T3_UNITS_VOLTS;
+            case ma:
+            case Amps:
+                return T3_UNITS_MILLIAMPS;
+            case Pa:
+            case KPa:
+                return T3_UNITS_PASCAL;
+            case psi:
+                return T3_UNITS_PSI;
+            case procent:
+                return T3_UNITS_PERCENT;
+            default:
+                return T3_UNITS_NONE;
+        }
+    }
+    return T3_UNITS_NONE;
 }
