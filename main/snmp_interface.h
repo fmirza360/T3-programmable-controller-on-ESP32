@@ -6,7 +6,7 @@
 // ---------------------------------------------------
 // Public defines (Configs)
 // ---------------------------------------------------
-#define ENTERPRISE_OID  "P.2026.30"     // used as sysObjectID and in trap
+#define ENTERPRISE_OID  "P.64991.30"    // used as sysObjectID and in trap
 #define TRAP_DST_ADDR   "192.168.1.14"  // Destination address for SNMP traps
 
 // ---------------------------------------------------

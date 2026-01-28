@@ -21,7 +21,7 @@
 // Log tag
 static const char *TAG = "snmp_bacnet";
 
-const char enterprise_oid_str[] = "2026.1";
+const char enterprise_oid_str[] = "64991.1";
 
 /* Configuration Type Names */
 static const char* cfgtype_names[] =
@@ -148,18 +148,18 @@ bool t3_map_snmp_oid_to_bacnet(const char* snmp_oid, t3_snmp_bacnet_mapping_t *m
     memset(mapping, 0, sizeof(t3_snmp_bacnet_mapping_t));
     
     // Parse OID to extract group, field, and instance
-    // Expected format: 1.3.6.1.4.1.2026.1.<group>.<field>.<instance>
+    // Expected format: 1.3.6.1.4.1.64991.1.<group>.<field>.<instance>
     
-    const char* temco_pos = strstr(snmp_oid, "2026.1");
+    const char* temco_pos = strstr(snmp_oid, enterprise_oid_str);
     if (!temco_pos) {
-        ESP_LOGE(TAG, "OID missing 2026.1 prefix: %s", snmp_oid);
+        ESP_LOGE(TAG, "OID missing %s prefix: %s", enterprise_oid_str, snmp_oid);
         return false;
     }
     
-    // Skip "TEMCO.1." to get to group
+    // Skip "64991.1." to get to group
     const char* group_pos = temco_pos + strlen(enterprise_oid_str);
     if (strlen(group_pos) < 5) { // At least ".<group>"
-        ESP_LOGE(TAG, "OID too short after 2026.1: %s", snmp_oid);
+        ESP_LOGE(TAG, "OID too short after %s.1: %s", enterprise_oid_str, snmp_oid);
         return false;
     }
     
