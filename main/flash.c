@@ -1271,7 +1271,7 @@ void Initial_points(uint8_t point_type)
 				ptr.pin->range = 30;
 				memcpy(ptr.pin->description,"INPUT VOLTAGE",strlen("INPUT VOLTAGE"));
 			}
-			
+
 			ptr = put_io_buf(IN,1);
 			memcpy(ptr.pin->description,"INPUT CURRENT",strlen("INPUT CURRENT"));
 			memcpy(ptr.pin->label,"INCURNT",strlen("INCURNT"));
@@ -1281,7 +1281,7 @@ void Initial_points(uint8_t point_type)
 				ptr.pin->range = 12;
 				memcpy(ptr.pin->description,"INPUT CURRENT",strlen("INPUT CURRENT"));
 			}
-			
+
 			ptr = put_io_buf(IN,2);
 			memcpy(ptr.pin->description,"INPUT POWER",strlen("INPUT POWER"));
 			memcpy(ptr.pin->label,"INPWR",strlen("INPWR"));
@@ -1291,7 +1291,7 @@ void Initial_points(uint8_t point_type)
 				ptr.pin->range = 31;
 				memcpy(ptr.pin->description,"INPUT POWER",strlen("INPUT POWER"));
 			}
-			
+
 			ptr = put_io_buf(IN,3);
 			memcpy(ptr.pin->description,"INPUT ENERGY",strlen("INPUT ENERGY"));
 			memcpy(ptr.pin->label,"INENGY",strlen("INENGY"));

@@ -15,8 +15,8 @@
 #include "lwip/sockets.h"
 #include "define.h"
 
+#include "app_log.h"
 #include "snmp_interface.h"
-static bool snmp_started = false;
 
 static const char *TAG = "WIFI";
 extern xSemaphoreHandle CountHandle;
@@ -82,6 +82,7 @@ esp_err_t event_handler_2(void *ctx, system_event_t *event)
     {
     case SYSTEM_EVENT_STA_START:
         ESP_LOGI(TAG, "Connecting to AP...");
+        app_log(TAG, "Connecting to AP...");
         //debug_info("event_handler_2 esp_wifi_connect()");
         esp_wifi_connect();
         SSID_Info.IP_Wifi_Status = WIFI_CONNECTED;
@@ -91,6 +92,7 @@ esp_err_t event_handler_2(void *ctx, system_event_t *event)
 
     case SYSTEM_EVENT_STA_GOT_IP:
         ESP_LOGI(TAG, "Connected.");
+        app_log(TAG, "Connected.");
        // debug_info("event_handler_2 SYSTEM_EVENT_STA_GOT_IP");
         wifi_retry_count = 0;
         //wifi_task_running = 1;
@@ -99,6 +101,7 @@ esp_err_t event_handler_2(void *ctx, system_event_t *event)
         break;
 
     case SYSTEM_EVENT_STA_DISCONNECTED:
+        ESP_LOGI(TAG, "Disconnected.");
     	//wifi_task_running = 0;
     	 SSID_Info.IP_Wifi_Status = WIFI_DISCONNECTED;
     	//debug_info("Wifi disconnected, try to connect ...");
@@ -190,7 +193,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
         } else
         {
         	//debug_info("s_retry_num  big ,stop try!");
-        	esp_wifi_connect();
+            esp_wifi_connect();
             xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
         }
         //ESP_LOGI(TAG,"connect to the AP fail");
@@ -217,10 +220,8 @@ static void event_handler(void* arg, esp_event_base_t event_base,
         if(Modbus.ethernet_status != 4)
         multicast_addr = Get_multicast_addr(&SSID_Info.ip_addr);
         save_wifi_info();
-		if (!snmp_started) {
-            snmp_started = true;
-			snmp_app_init();
-		}
+        /* Start SNMP agent */
+        snmp_app_init();
         s_retry_num = 0;
 #if 1//DNS
         if((SSID_Info.getway[0] == 0) && (SSID_Info.getway[1] == 0) && (SSID_Info.getway[2] == 0) && (SSID_Info.getway[3] == 0))
